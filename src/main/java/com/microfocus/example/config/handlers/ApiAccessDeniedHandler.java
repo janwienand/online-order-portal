@@ -50,7 +50,7 @@ public class ApiAccessDeniedHandler implements AccessDeniedHandler {
             throws IOException, ServletException {
         response.setStatus(HttpServletResponse.SC_FORBIDDEN);
         ArrayList<String> errors = new ArrayList<>();
-        errors.add(ex.getLocalizedMessage());
+        errors.add("Access denied"); // L53
         ApiStatusResponse apiStatusResponse = new ApiStatusResponse
                 .ApiResponseBuilder()
                 .withSuccess(false)
