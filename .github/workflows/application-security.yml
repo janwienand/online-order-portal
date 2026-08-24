@@ -46,25 +46,18 @@ jobs:
         uses: fortify/github-action@v3
         env:
           # Public regional endpoint, not a secret.
-          FOD_URL: https://api.emea.fortify.com
+          FOD_URL: https://api.eu.fortify.com
           FOD_TENANT: ${{ secrets.FOD_TENANT }}
           FOD_USER: ${{ secrets.FOD_USER }}
           FOD_PASSWORD: ${{ secrets.FOD_PAT }}
           FOD_RELEASE: ${{ vars.FOD_RELEASE }}
-          # Setup must run every time so the open source flag below is re-applied
-          # to the release before each scan; it does not otherwise persist.
+          # Re-apply scan settings on every run and force the override, since
+          # setup is otherwise skipped once a release already has settings.
           DO_SETUP: "true"
-          # Setup is skipped by default once a release already has scan settings,
-          # so force it to re-apply them on every run.
           OVERRIDE_SAST_SETTINGS: "true"
-          # Setup does not carry technology stack / language level through from
-          # its own defaults, and would silently fall back to Auto Detect
-          # otherwise, so they are restated explicitly here.
-          SETUP_EXTRA_OPTS: '--technology-stack "JAVA/J2EE/Kotlin" --language-level "1.8"'
-          # Static Assessment (117) accepts the open source flag without error
-          # but never actually runs it on this tenant; Static+ Assessment
-          # includes open source as part of the package.
-          SAST_ASSESSMENT_TYPE: "118"
+          # Technology stack and language level are intentionally left unset,
+          # so setup falls back to Auto Detect, matching the release's manual
+          # FoD configuration.
           # Open source is analysed here too, in parallel with the dedicated
           # engine in the job below, so the two result sets can be compared.
           DO_SCA_SCAN: "true"
