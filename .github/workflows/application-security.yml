@@ -1,0 +1,115 @@
+# Everything visible in the Actions tab is named after what it does, not after the
+# tool that does it. Product names live in the secrets and in the documentation.
+
+name: Application security
+
+# Pull requests only ever run the component check, and only when a dependency
+# actually changed. Source code analysis runs on main and on demand, never on a
+# pull request: this repository carries a batch of automated remediation PRs, and
+# a full source scan on each of them would be slow, noisy and pointless.
+on:
+  push:
+    branches: [main]
+  pull_request:
+    paths:
+      - pom.xml
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  security-events: write
+  pull-requests: write
+  actions: write
+
+jobs:
+
+  static-analysis:
+    name: Static code analysis
+    runs-on: ubuntu-latest
+    # Never on a pull request. See the trigger comment above.
+    if: github.event_name != 'pull_request'
+    steps:
+      - name: Check out the code
+        uses: actions/checkout@v5
+
+      - name: Set up the build environment
+        uses: actions/setup-java@v5
+        with:
+          java-version: '17'
+          distribution: temurin
+          cache: maven
+
+      # One step: package the source, submit it, wait for the result, evaluate the
+      # policy and publish the findings into the Security tab. The analysis engine
+      # is the same one a developer can run locally before pushing.
+      - name: Analyse the source code and publish findings
+        uses: fortify/github-action@v3
+        env:
+          # Public regional endpoint, not a secret.
+          FOD_URL: https://api.emea.fortify.com
+          FOD_TENANT: ${{ secrets.FOD_TENANT }}
+          FOD_USER: ${{ secrets.FOD_USER }}
+          FOD_PASSWORD: ${{ secrets.FOD_PAT }}
+          FOD_RELEASE: ${{ vars.FOD_RELEASE }}
+          DO_SETUP: "false"
+          # Open source is analysed in its own job below, by a dedicated engine.
+          DO_SCA_SCAN: "false"
+          DO_AVIATOR_AUDIT: "true"
+          PACKAGE_EXTRA_OPTS: -bt mvn
+          DO_CHECK_POLICY: "true"
+
+  open-source-analysis:
+    name: Open source analysis
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check out the code
+        uses: actions/checkout@v5
+
+      - name: Set up the build environment
+        uses: actions/setup-java@v5
+        with:
+          distribution: temurin
+          java-version: '17'
+          cache: maven
+
+      - name: Install the analysis tooling
+        run: |
+          curl -LsS https://github.com/debricked/cli/releases/download/release-v2/cli_linux_x86_64.tar.gz \
+            | tar -xz debricked
+          sudo mv debricked /usr/local/bin/debricked
+          debricked --version
+
+      - name: Resolve the dependency tree
+        run: debricked resolve
+
+      - name: Evaluate components against policy
+        env:
+          DEBRICKED_TOKEN: ${{ secrets.DEBRICKED_TOKEN }}
+        run: |
+          if [ -z "$DEBRICKED_TOKEN" ]; then
+            echo "::error::No analysis credentials configured for this repository."
+            exit 1
+          fi
+          debricked scan -t "$DEBRICKED_TOKEN"
+
+  release-gate:
+    name: Release gate
+    runs-on: ubuntu-latest
+    needs: [static-analysis, open-source-analysis]
+    if: always()
+    steps:
+      - name: Decide whether this release may proceed
+        run: |
+          CODE="${{ needs.static-analysis.result }}"
+          DEPS="${{ needs.open-source-analysis.result }}"
+          echo "Source code analysis ..... $CODE"
+          echo "Open source analysis ..... $DEPS"
+          # "skipped" is a valid outcome: on a pull request only the component
+          # check runs, and that check alone decides the gate.
+          for r in "$CODE" "$DEPS"; do
+            case "$r" in
+              success|skipped) ;;
+              *) echo "::error::A security check did not pass. This build is blocked."; exit 1 ;;
+            esac
+          done
+          echo "Every check that ran passed. This build may proceed."
