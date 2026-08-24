@@ -51,9 +51,19 @@ jobs:
           FOD_USER: ${{ secrets.FOD_USER }}
           FOD_PASSWORD: ${{ secrets.FOD_PAT }}
           FOD_RELEASE: ${{ vars.FOD_RELEASE }}
-          DO_SETUP: "false"
-          # Open source is analysed in its own job below, by a dedicated engine.
-          DO_SCA_SCAN: "false"
+          # Setup must run every time so the open source flag below is re-applied
+          # to the release before each scan; it does not otherwise persist.
+          DO_SETUP: "true"
+          # Setup is skipped by default once a release already has scan settings,
+          # so force it to re-apply them on every run.
+          OVERRIDE_SAST_SETTINGS: "true"
+          # Setup does not carry technology stack / language level through from
+          # its own defaults, and would silently fall back to Auto Detect
+          # otherwise, so they are restated explicitly here.
+          SETUP_EXTRA_OPTS: '--technology-stack "JAVA/J2EE/Kotlin" --language-level "1.8"'
+          # Open source is analysed here too, in parallel with the dedicated
+          # engine in the job below, so the two result sets can be compared.
+          DO_SCA_SCAN: "true"
           DO_AVIATOR_AUDIT: "true"
           PACKAGE_EXTRA_OPTS: -bt mvn
           DO_CHECK_POLICY: "true"
