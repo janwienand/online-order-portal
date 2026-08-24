@@ -61,6 +61,10 @@ jobs:
           # its own defaults, and would silently fall back to Auto Detect
           # otherwise, so they are restated explicitly here.
           SETUP_EXTRA_OPTS: '--technology-stack "JAVA/J2EE/Kotlin" --language-level "1.8"'
+          # Static Assessment (117) accepts the open source flag without error
+          # but never actually runs it on this tenant; Static+ Assessment
+          # includes open source as part of the package.
+          SAST_ASSESSMENT_TYPE: "118"
           # Open source is analysed here too, in parallel with the dedicated
           # engine in the job below, so the two result sets can be compared.
           DO_SCA_SCAN: "true"
