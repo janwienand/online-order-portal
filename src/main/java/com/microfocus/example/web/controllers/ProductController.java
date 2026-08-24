@@ -90,7 +90,9 @@ public class ProductController extends AbstractBaseController {
 
     	String retContent = "Product search using: " + keywords;
     	
-        return ResponseEntity.ok().body(retContent);
+        return ResponseEntity.ok()
+                .contentType(MediaType.TEXT_PLAIN)
+                .body(retContent);
     }
 
     @GetMapping("/firstaid")
