@@ -75,6 +75,7 @@
                                         </div>
                                         <div class="modal-footer">
                                             <form th:action="@{/admin/messages/delete/{id}(id=${m.id})}" method="post">
+                                                <input type="hidden" th:name="${_csrf.parameterName}" th:value="${_csrf.token}"/>
                                                 <button type="submit" class="btn btn-danger" role="button"><i class="fa fa-check"></i>&nbsp;Yes</button>
                                                 <button type="button" class="btn btn-default" role="button" data-dismiss="modal">No</button>
                                             </form>
