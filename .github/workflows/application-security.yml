@@ -72,12 +72,19 @@ jobs:
       # set into the same Security tab, publish it through the dependency graph
       # instead: download the completed open-source analysis as an SBOM and hand
       # it to GitHub's own vulnerability matching (Dependabot alerts).
+      #
+      # `if: always()`: the analysis step above fails its own job whenever the
+      # security policy finds a violation - by design, that's what fails the
+      # release gate. The scan itself still completed, so these steps must run
+      # regardless of that step's outcome, not be skipped by it.
       - name: Set up the Fortify CLI for the following steps
+        if: always()
         uses: fortify/github-action/setup@v3
         with:
           fcli: latest
 
       - name: Download the open-source analysis as an SBOM
+        if: always()
         env:
           FOD_URL: https://api.eu.fortify.com
           FOD_TENANT: ${{ secrets.FOD_TENANT }}
@@ -90,6 +97,7 @@ jobs:
           fcli fod session logout
 
       - name: Publish open-source findings to the dependency graph
+        if: always()
         uses: advanced-security/spdx-dependency-submission-action@v0
         with:
           filePath: "."
