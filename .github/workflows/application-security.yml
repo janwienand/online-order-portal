@@ -16,7 +16,9 @@ on:
   workflow_dispatch:
 
 permissions:
-  contents: read
+  # write, not read: the dependency-graph submission step needs it to publish
+  # the open-source SBOM.
+  contents: write
   security-events: write
   pull-requests: write
   actions: write
@@ -64,6 +66,33 @@ jobs:
           DO_AVIATOR_AUDIT: "true"
           PACKAGE_EXTRA_OPTS: -bt mvn
           DO_CHECK_POLICY: "true"
+
+      # The SARIF export above only ever carries SAST findings - that's a hard
+      # limit of the SARIF format, not a setting. To get the open-source result
+      # set into the same Security tab, publish it through the dependency graph
+      # instead: download the completed open-source analysis as an SBOM and hand
+      # it to GitHub's own vulnerability matching (Dependabot alerts).
+      - name: Set up the Fortify CLI for the following steps
+        uses: fortify/github-action/setup@v3
+        with:
+          fcli: latest
+
+      - name: Download the open-source analysis as an SBOM
+        env:
+          FOD_URL: https://api.eu.fortify.com
+          FOD_TENANT: ${{ secrets.FOD_TENANT }}
+          FOD_USER: ${{ secrets.FOD_USER }}
+          FOD_PASSWORD: ${{ secrets.FOD_PAT }}
+          FOD_RELEASE: ${{ vars.FOD_RELEASE }}
+        run: |
+          fcli fod session login --url "$FOD_URL" -t "$FOD_TENANT" -u "$FOD_USER" -p "$FOD_PASSWORD"
+          fcli fod oss-scan download-latest --release "$FOD_RELEASE" --format SPDX --file fod-oss-sbom.spdx.json
+          fcli fod session logout
+
+      - name: Publish open-source findings to the dependency graph
+        uses: advanced-security/spdx-dependency-submission-action@v0
+        with:
+          filePath: "."
 
   open-source-analysis:
     name: Open source analysis
