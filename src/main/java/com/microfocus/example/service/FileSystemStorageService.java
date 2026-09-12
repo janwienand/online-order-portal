@@ -140,7 +140,11 @@ public class FileSystemStorageService implements StorageService {
 
     @Override
     public Path load(String filename) {
-        return rootLocation.resolve(filename);
+        Path file = rootLocation.resolve(filename).normalize().toAbsolutePath();
+        if (!file.getParent().equals(this.rootLocation.toAbsolutePath())) {
+            throw new StorageException("Cannot access file outside current directory.");
+        }
+        return file;
     }
 
     @Override
